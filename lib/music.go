@@ -36,13 +36,13 @@ type MusicList struct {
 func GetMusic(str string) (MusicResponseBody, error){
 
 	//str := "红豆"
-	url := "http://a.apix.cn/geekery/music/query?s=" + str + "&limit=2&p=1"
+	url := "http://a.apix.cn/geekery/music/query?s=" + str + "&limit=10&p=1"
 
 	req, _ := http.NewRequest("GET", url, nil)
 
 	req.Header.Add("accept", "application/json")
 	req.Header.Add("content-type", "application/json")
-	req.Header.Add("apix-key", "84d3e0847c714d39725ef1dd6c9fb5db")
+	req.Header.Add("apix-key", "")
 
 	res, _ := http.DefaultClient.Do(req)
 
@@ -58,11 +58,4 @@ func GetMusic(str string) (MusicResponseBody, error){
 	
 	return config,err
 	
-	/*if err := json.Unmarshal([]byte(string(body)), &config); err == nil {
-		fmt.Println(config)
-		fmt.Println(config.Data.Data.List)
-	} else {
-		fmt.Println(err)
-	}*/
-
 }
