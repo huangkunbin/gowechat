@@ -450,6 +450,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				textRequestBody.FromUserName)
 
 			config, error := GetMusic(textRequestBody.Content)
+            
 
 			if error == nil {
 				//fmt.Println(config)
@@ -466,7 +467,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					item.Title = value2CDATA(l.SongName + "_" + l.UserName + "_《" + l.AlbumName + "》")
 					item.Description = value2CDATA(l.SongName + "_" + l.UserName + "_《" + l.AlbumName + "》")
 					item.PicUrl = value2CDATA(l.AlbumPic)
-					item.Url = value2CDATA(l.SongUrl)
+					item.Url = value2CDATA("http://huangkunbin.name/playmusic/"+base64.URLEncoding.EncodeToString([]byte(l.SongUrl)))
 
 					items.Item = append(items.Item, item)
 
