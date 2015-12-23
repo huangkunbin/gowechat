@@ -11,6 +11,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	. "github.com/huangkunbin/gowechat/lib"
 	"io"
 	"io/ioutil"
 	"log"
@@ -55,6 +56,27 @@ type TextResponseBody struct {
 	CreateTime   string
 	MsgType      CDATAText
 	Content      CDATAText
+}
+
+type ArticleResponseBody struct {
+	XMLName      xml.Name `xml:"xml"`
+	ToUserName   CDATAText
+	FromUserName CDATAText
+	CreateTime   string
+	MsgType      CDATAText
+	ArticleCount int
+	Articles     ArticlesStruct
+}
+
+type ArticlesStruct struct {
+	Item []ItemStruct `xml:"item"`
+}
+
+type ItemStruct struct {
+	Title       CDATAText
+	Description CDATAText
+	PicUrl      CDATAText
+	Url         CDATAText
 }
 
 type EncryptRequestBody struct {
@@ -172,12 +194,55 @@ func makeEncryptResponseBody(fromUserName, toUserName, content, nonce, timestamp
 	return xml.MarshalIndent(encryptBody, " ", "  ")
 }
 
+func makeEncryptArticlesResponseBody(fromUserName, toUserName, nonce, timestamp string, count int, content ArticlesStruct) ([]byte, error) {
+	encryptBody := &EncryptResponseBody{}
+
+	encryptXmlData, _ := makeEncryptArticlesXmlData(fromUserName, toUserName, timestamp, count, content)
+	encryptBody.Encrypt = value2CDATA(encryptXmlData)
+	encryptBody.MsgSignature = value2CDATA(makeMsgSignature(timestamp, nonce, encryptXmlData))
+	encryptBody.TimeStamp = timestamp
+	encryptBody.Nonce = value2CDATA(nonce)
+
+	return xml.MarshalIndent(encryptBody, " ", "  ")
+}
+
 func makeEncryptXmlData(fromUserName, toUserName, timestamp, content string) (string, error) {
 	textResponseBody := &TextResponseBody{}
 	textResponseBody.FromUserName = value2CDATA(fromUserName)
 	textResponseBody.ToUserName = value2CDATA(toUserName)
 	textResponseBody.MsgType = value2CDATA("text")
 	textResponseBody.Content = value2CDATA(content)
+	textResponseBody.CreateTime = timestamp
+	body, err := xml.MarshalIndent(textResponseBody, " ", "  ")
+	if err != nil {
+		return "", errors.New("xml marshal error")
+	}
+
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.BigEndian, int32(len(body)))
+	if err != nil {
+		fmt.Println("Binary write err:", err)
+	}
+	bodyLength := buf.Bytes()
+
+	randomBytes := []byte("abcdefghijklmnop")
+
+	plainData := bytes.Join([][]byte{randomBytes, bodyLength, body, []byte(appID)}, nil)
+	cipherData, err := aesEncrypt(plainData, aesKey)
+	if err != nil {
+		return "", errors.New("aesEncrypt error")
+	}
+
+	return base64.StdEncoding.EncodeToString(cipherData), nil
+}
+
+func makeEncryptArticlesXmlData(fromUserName, toUserName, timestamp string, count int, content ArticlesStruct) (string, error) {
+	textResponseBody := &ArticleResponseBody{}
+	textResponseBody.FromUserName = value2CDATA(fromUserName)
+	textResponseBody.ToUserName = value2CDATA(toUserName)
+	textResponseBody.MsgType = value2CDATA("news")
+	textResponseBody.ArticleCount = count
+	textResponseBody.Articles = content
 	textResponseBody.CreateTime = timestamp
 	body, err := xml.MarshalIndent(textResponseBody, " ", "  ")
 	if err != nil {
@@ -384,16 +449,55 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				textRequestBody.Content,
 				textRequestBody.FromUserName)
 
-			responseEncryptTextBody, _ := makeEncryptResponseBody(textRequestBody.ToUserName,
-				textRequestBody.FromUserName,
-				"Hello, "+textRequestBody.FromUserName,
-				nonce,
-				timestamp)
-			w.Header().Set("Content-Type", "text/xml")
-			fmt.Println("\n", string(responseEncryptTextBody))
-			fmt.Fprintf(w, string(responseEncryptTextBody))
+			config, error := GetMusic(textRequestBody.Content)
 
-			parseEncryptResponse(responseEncryptTextBody)
+			if error == nil {
+				//fmt.Println(config)
+				//fmt.Println(config.Data.Data.List)
+				list := config.Data.Data.List
+				var items ArticlesStruct
+
+				var item ItemStruct
+
+				for _, l := range list {
+
+					//fmt.Println(l.SongUrl)
+
+					item.Title = value2CDATA(l.SongName + "_" + l.UserName + "_《" + l.AlbumName + "》")
+					item.Description = value2CDATA(l.SongName + "_" + l.UserName + "_《" + l.AlbumName + "》")
+					item.PicUrl = value2CDATA(l.AlbumPic)
+					item.Url = value2CDATA(l.SongUrl)
+
+					items.Item = append(items.Item, item)
+
+				}
+
+				//fmt.Println(items)
+				count := len(list)
+
+				responseEncryptTextBody, _ := makeEncryptArticlesResponseBody(textRequestBody.ToUserName,
+					textRequestBody.FromUserName,
+					nonce,
+					timestamp, count, items)
+				w.Header().Set("Content-Type", "text/xml")
+				fmt.Println("\n", string(responseEncryptTextBody))
+				fmt.Fprintf(w, string(responseEncryptTextBody))
+				parseEncryptResponse(responseEncryptTextBody)
+
+			} else {
+				//fmt.Println(error)
+
+				responseEncryptTextBody, _ := makeEncryptResponseBody(textRequestBody.ToUserName,
+					textRequestBody.FromUserName,
+					"sorry, I don't understand.",
+					nonce,
+					timestamp)
+				w.Header().Set("Content-Type", "text/xml")
+				fmt.Println("\n", string(responseEncryptTextBody))
+				fmt.Fprintf(w, string(responseEncryptTextBody))
+				parseEncryptResponse(responseEncryptTextBody)
+			}
+
 		} else if encryptType == "raw" {
 			log.Println("Wechat Service: in raw mode")
 		}
@@ -401,6 +505,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
 	log.Println("Wechat Service: Start!")
 	http.HandleFunc("/", procRequest)
 	err := http.ListenAndServe(":1993", nil)
