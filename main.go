@@ -450,7 +450,6 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				textRequestBody.FromUserName)
 
 			config, error := GetMusic(textRequestBody.Content)
-            
 
 			if error == nil {
 				//fmt.Println(config)
@@ -467,7 +466,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					item.Title = value2CDATA(l.SongName + "_" + l.UserName + "_《" + l.AlbumName + "》")
 					item.Description = value2CDATA(l.SongName + "_" + l.UserName + "_《" + l.AlbumName + "》")
 					item.PicUrl = value2CDATA(l.AlbumPic)
-					item.Url = value2CDATA("http://huangkunbin.name/playmusic/"+base64.URLEncoding.EncodeToString([]byte(l.SongUrl)))
+					item.Url = value2CDATA("http://huangkunbin.name/playmusic/" + base64.URLEncoding.EncodeToString([]byte(l.SongUrl)))
 
 					items.Item = append(items.Item, item)
 
@@ -476,21 +475,37 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				//fmt.Println(items)
 				count := len(list)
 
-				responseEncryptTextBody, _ := makeEncryptArticlesResponseBody(textRequestBody.ToUserName,
-					textRequestBody.FromUserName,
-					nonce,
-					timestamp, count, items)
-				w.Header().Set("Content-Type", "text/xml")
-				fmt.Println("\n", string(responseEncryptTextBody))
-				fmt.Fprintf(w, string(responseEncryptTextBody))
-				parseEncryptResponse(responseEncryptTextBody)
+				if count > 0 {
+					responseEncryptTextBody, _ := makeEncryptArticlesResponseBody(textRequestBody.ToUserName,
+						textRequestBody.FromUserName,
+						nonce,
+						timestamp, count, items)
+
+					w.Header().Set("Content-Type", "text/xml")
+					fmt.Println("\n", string(responseEncryptTextBody))
+					fmt.Fprintf(w, string(responseEncryptTextBody))
+					parseEncryptResponse(responseEncryptTextBody)
+
+				} else {
+					responseEncryptTextBody, _ := makeEncryptResponseBody(textRequestBody.ToUserName,
+						textRequestBody.FromUserName,
+						"sorry, I don't understand.",
+						nonce,
+						timestamp)
+
+					w.Header().Set("Content-Type", "text/xml")
+					fmt.Println("\n", string(responseEncryptTextBody))
+					fmt.Fprintf(w, string(responseEncryptTextBody))
+					parseEncryptResponse(responseEncryptTextBody)
+
+				}
 
 			} else {
 				//fmt.Println(error)
 
 				responseEncryptTextBody, _ := makeEncryptResponseBody(textRequestBody.ToUserName,
 					textRequestBody.FromUserName,
-					"sorry, I don't understand.",
+					"Sorry, 搜索不到相关歌曲.",
 					nonce,
 					timestamp)
 				w.Header().Set("Content-Type", "text/xml")
