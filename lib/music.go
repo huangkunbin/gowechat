@@ -1,11 +1,11 @@
 package lib
 
 import (
-	"encoding/json"
+	//"encoding/json"
+	"github.com/pquerna/ffjson/ffjson"
 	//"fmt"
 	"io/ioutil"
 	"net/http"
-	
 )
 
 type MusicResponseBody struct {
@@ -33,7 +33,7 @@ type MusicList struct {
 	SongUrl   string `json:"songUrl"`
 }
 
-func GetMusic(str string) (MusicResponseBody, error){
+func GetMusic(str string) (MusicResponseBody, error) {
 
 	//str := "红豆"
 	url := "http://a.apix.cn/geekery/music/query?s=" + str + "&limit=10&p=1"
@@ -42,7 +42,7 @@ func GetMusic(str string) (MusicResponseBody, error){
 
 	req.Header.Add("accept", "application/json")
 	req.Header.Add("content-type", "application/json")
-	req.Header.Add("apix-key", "")
+	req.Header.Add("apix-key", "yourkey")
 
 	res, _ := http.DefaultClient.Do(req)
 
@@ -53,9 +53,9 @@ func GetMusic(str string) (MusicResponseBody, error){
 	//fmt.Println(string(body))
 
 	var config MusicResponseBody
-	
-	err := json.Unmarshal([]byte(string(body)), &config)
-	
-	return config,err
-	
+
+	err := ffjson.Unmarshal([]byte(string(body)), &config)
+
+	return config, err
+
 }
